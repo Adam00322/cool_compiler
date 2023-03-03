@@ -58,13 +58,10 @@ class Main inherits IO {
       i : A2I <- new A2I,
       s2 : Stack <- (new Stack).init(),
       s : Stack <- (new Stack).init() in {
+         out_string(">");
          c <- in_string();
 
          while (not c = "x") loop {
-            out_string(">"); --输出指令
-            out_string(c);
-            out_string("\n");
-            
             if c = "e" then {
                t <- s.top();
 
@@ -97,12 +94,10 @@ class Main inherits IO {
                s.push(c); --入栈
             } fi fi;
 
+            out_string(">");
             c <- in_string(); --获取下一个指令
          } pool;
 
-         out_string(">");
-         out_string(c);
-         out_string("\n");
       }
    };
 };
