@@ -1,12 +1,13 @@
-/*
- *  The scanner definition for COOL.
+ /*
+ * The scanner definition for COOL.
  */
 
-/*
+ /* 
  *  Stuff enclosed in %{ %} in the first section is copied verbatim to the
  *  output, so headers and global definitions are placed here to be visible
- * to the code in the file.  Don't remove anything that was here initially
+ *  to the code in the file.  Dont remove anything that was here initially
  */
+
 %{
 #include <cool-parse.h>
 #include <stringtab.h>
@@ -43,23 +44,31 @@ extern YYSTYPE cool_yylval;
  *  Add Your own definitions here
  */
 
+static int comment_line_num = 0;
 %}
-
-/*
+ /* begin of definitions */
+ /*
  * Define names for regular expressions here.
  */
-digit           [0-9]
-letter          [a-zA-Z]
-id              {letter}({letter}|{digit})*
-number          {digit}+
-string          \"[^\"]*\"
-keywords        "class" | "else" | "false" | "fi" | "if" | "in" | "inherits" | "isvoid" | "let" | "loop" | "pool" | "then" | "while" |
-"case" | "esac" | "new" | "of" | "not" | "true"
+DIGIT           [0-9]
+LETTER          [a-zA-Z]
+TYPEID          [A-Z][a-zA-Z0-9_]*
+OBJECTID        [a-z][a-zA-Z0-9_]*
+NUMBER          {DIGIT}+
+
+ /*
+  keywords        "class" | "else" | "false" | "fi" | "if" | "in" | "inherits" | "isvoid" | "let" | "loop" | "pool" | "then" | "while" |
+  "case" | "esac" | "new" | "of" | "not" | "true"
+ */
+
 DARROW          =>
-%x comments
+ASSIGN          <-
+LESSEQUAL       <=
+%x COMMENTS
+%x STRING
 
 %%
-
+ /* begin of rules */
  /*
   *  Nested comments
   */
@@ -68,14 +77,61 @@ DARROW          =>
  /*
   *  The multiple-character operators.
   */
-{DARROW}		{ return (DARROW); }
-{keywords}  { return cool_yylval.symbol = idtable.add_string(yytext); }
+
+
+ /* keywords */
+(?i:class)      {  return (CLASS);  }
+(?i:else)       {  return (ELSE);   }
+(?i:fi)         {  return (FI);     }
+(?i:if)         {  return (IF);     }
+(?i:in)         {  return (IN);     }
+(?i:inherits)   {  return (INHERITS);}
+(?i:isvoid)     {  return (ISVOID); }
+(?i:let)        {  return (LET);    }
+(?i:loop)       {  return (LOOP);   }
+(?i:pool)       {  return (POOL);   }
+(?i:then)       {  return (THEN);   }
+(?i:while)      {  return (WHILE);  }
+(?i:case)       {  return (CASE);   }
+(?i:esac)       {  return (ESAC);   }
+(?i:new)        {  return (NEW);    }
+(?i:of)         {  return (OF);     }
+(?i:not)        {  return (NOT);    }
+
+t(?i:rue) {
+  cool_yylval.boolean = true;
+  return (BOOL_CONST);
+}
+
+f(?i:alse) {
+  cool_yylval.boolean = false;
+  return (BOOL_CONST);
+}
+
+{NUMBER} {
+  cool_yylval.symbol = inttable.add_string(yytext);
+  return (INT_CONST);
+}
+
+{TYPEID} {
+  cool_yylval.symbol = idtable.add_string(yytext);
+  return (TYPEID);
+}
+
+{OBJECTID} {
+  cool_yylval.symbol = idtable.add_string(yytext);
+  return (OBJECTID);
+}
+
+
+{DARROW}		    { return (DARROW); }
+
 
  /*
   * Keywords are case-insensitive except for the values true and false,
   * which must begin with a lower-case letter.
   */
-"class"     { return (CLASS); }
+
 
 
  /*
@@ -85,5 +141,10 @@ DARROW          =>
   *
   */
 
+ /* if all are not match, then error */
+[^\n] {
+  yylval.error_msg = yytext;
+  return (ERROR);
+}
 
 %%
