@@ -48,8 +48,15 @@ extern YYSTYPE cool_yylval;
 /*
  * Define names for regular expressions here.
  */
-
+digit           [0-9]
+letter          [a-zA-Z]
+id              {letter}({letter}|{digit})*
+number          {digit}+
+string          \"[^\"]*\"
+keywords        "class" | "else" | "false" | "fi" | "if" | "in" | "inherits" | "isvoid" | "let" | "loop" | "pool" | "then" | "while" |
+"case" | "esac" | "new" | "of" | "not" | "true"
 DARROW          =>
+%x comments
 
 %%
 
@@ -62,11 +69,13 @@ DARROW          =>
   *  The multiple-character operators.
   */
 {DARROW}		{ return (DARROW); }
+{keywords}  { return cool_yylval.symbol = idtable.add_string(yytext); }
 
  /*
   * Keywords are case-insensitive except for the values true and false,
   * which must begin with a lower-case letter.
   */
+"class"     { return (CLASS); }
 
 
  /*
