@@ -55,6 +55,9 @@ LETTER          [a-zA-Z]
 TYPEID          [A-Z][a-zA-Z0-9_]*
 OBJECTID        [a-z][a-zA-Z0-9_]*
 NUMBER          {DIGIT}+
+TRUE            t(?i:rue)
+FALSE           f(?i:alse)
+LINECOMMENT  --.*
 
  /*
   keywords        "class" | "else" | "false" | "fi" | "if" | "in" | "inherits" | "isvoid" | "let" | "loop" | "pool" | "then" | "while" |
@@ -69,70 +72,59 @@ LESSEQUAL       <=
 
 %%
  /* begin of rules */
+
+ /* one line comment */
+<INITIAL>{LINECOMMENT}   { }
+
  /*
   *  Nested comments
   */
 
-
- /*
-  *  The multiple-character operators.
-  */
-
-
  /* keywords */
-(?i:class)      {  return (CLASS);  }
-(?i:else)       {  return (ELSE);   }
-(?i:fi)         {  return (FI);     }
-(?i:if)         {  return (IF);     }
-(?i:in)         {  return (IN);     }
-(?i:inherits)   {  return (INHERITS);}
-(?i:isvoid)     {  return (ISVOID); }
-(?i:let)        {  return (LET);    }
-(?i:loop)       {  return (LOOP);   }
-(?i:pool)       {  return (POOL);   }
-(?i:then)       {  return (THEN);   }
-(?i:while)      {  return (WHILE);  }
-(?i:case)       {  return (CASE);   }
-(?i:esac)       {  return (ESAC);   }
-(?i:new)        {  return (NEW);    }
-(?i:of)         {  return (OF);     }
-(?i:not)        {  return (NOT);    }
+<INITIAL>(?i:class)      {  return (CLASS);  }
+<INITIAL>(?i:else)       {  return (ELSE);   }
+<INITIAL>(?i:fi)         {  return (FI);     }
+<INITIAL>(?i:if)         {  return (IF);     }
+<INITIAL>(?i:in)         {  return (IN);     }
+<INITIAL>(?i:inherits)   {  return (INHERITS);}
+<INITIAL>(?i:isvoid)     {  return (ISVOID); }
+<INITIAL>(?i:let)        {  return (LET);    }
+<INITIAL>(?i:loop)       {  return (LOOP);   }
+<INITIAL>(?i:pool)       {  return (POOL);   }
+<INITIAL>(?i:then)       {  return (THEN);   }
+<INITIAL>(?i:while)      {  return (WHILE);  }
+<INITIAL>(?i:case)       {  return (CASE);   }
+<INITIAL>(?i:esac)       {  return (ESAC);   }
+<INITIAL>(?i:new)        {  return (NEW);    }
+<INITIAL>(?i:of)         {  return (OF);     }
+<INITIAL>(?i:not)        {  return (NOT);    }
 
-t(?i:rue) {
+ /* true */
+<INITIAL>{TRUE} {
   cool_yylval.boolean = true;
   return (BOOL_CONST);
 }
 
-f(?i:alse) {
+ /* false */
+<INITIAL>{FALSE} {
   cool_yylval.boolean = false;
   return (BOOL_CONST);
 }
 
-{NUMBER} {
+<INITIAL>{NUMBER} {
   cool_yylval.symbol = inttable.add_string(yytext);
   return (INT_CONST);
 }
 
-{TYPEID} {
+<INITIAL>{TYPEID} {
   cool_yylval.symbol = idtable.add_string(yytext);
   return (TYPEID);
 }
 
-{OBJECTID} {
+<INITIAL>{OBJECTID} {
   cool_yylval.symbol = idtable.add_string(yytext);
   return (OBJECTID);
 }
-
-
-{DARROW}		    { return (DARROW); }
-
-
- /*
-  * Keywords are case-insensitive except for the values true and false,
-  * which must begin with a lower-case letter.
-  */
-
-
 
  /*
   *  String constants (C syntax)
@@ -141,8 +133,37 @@ f(?i:alse) {
   *
   */
 
+ /* operators */
+<INITIAL>{LESSEQUAL}    { return (LE); }
+<INITIAL>{ASSIGN}       { return (ASSIGN); }
+<INITIAL>{DARROW}       { return (DARROW); }
+<INITIAL>"+"            { return int('+'); }
+<INITIAL>"-"            { return int('-'); }
+<INITIAL>"*"            { return int('*'); }
+<INITIAL>"/"            { return int('/'); }
+<INITIAL>"<"            { return int('<'); }
+<INITIAL>"="            { return int('='); }
+<INITIAL>"."            { return int('.'); }
+<INITIAL>";"            { return int(';'); }
+<INITIAL>"~"            { return int('~'); }
+<INITIAL>"{"            { return int('{'); }
+<INITIAL>"}"            { return int('}'); }
+<INITIAL>"("            { return int('('); }
+<INITIAL>")"            { return int(')'); }
+<INITIAL>":"            { return int(':'); }
+<INITIAL>"@"            { return int('@'); }
+<INITIAL>","            { return int(','); }
+
+ /* white space */
+<INITIAL>[ \r\f\t\v]+ { }
+
+ /* end of line */
+<INITIAL>"\n" {
+  curr_lineno++;
+}
+
  /* if all are not match, then error */
-[^\n] {
+<INITIAL>[^\n] {
   yylval.error_msg = yytext;
   return (ERROR);
 }
