@@ -44,7 +44,7 @@ extern YYSTYPE cool_yylval;
  *  Add Your own definitions here
  */
 
-static int comment_line_num = 0;
+static int comment_nested_num = 0;
 %}
  /* begin of definitions */
  /*
@@ -76,9 +76,36 @@ LESSEQUAL       <=
  /* one line comment */
 <INITIAL>{LINECOMMENT}   { }
 
- /*
-  *  Nested comments
-  */
+ /* Nested comments */
+<INITIAL,COMMENTS>"(*" {
+  comment_nested_num++;
+  BEGIN(COMMENTS);
+}
+
+<COMMENTS>"\n" {
+  curr_lineno++;
+}
+
+<COMMENTS>"*)" {
+  comment_nested_num--;
+  if(comment_nested_num == 0) {
+    BEGIN(INITIAL);
+  }
+}
+
+<COMMENTS><<EOF>> {
+  yylval.error_msg = "EOF in COMMENTS!";
+  return (ERROR);
+}
+
+<COMMENTS>[^\n(*)]* { }
+
+<COMMENTS>[(*)] { }
+
+<INITIAL>"*)" {
+  yylval.error_msg = "get *) without (* ahead!";
+  return (ERROR);
+}
 
  /* keywords */
 <INITIAL>(?i:class)      {  return (CLASS);  }
@@ -132,6 +159,41 @@ LESSEQUAL       <=
   *  \n \t \b \f, the result is c.
   *
   */
+  /* start of string */
+<INITIAL>"\"" {
+  BEGIN(STRING);
+}
+
+<STRING><<EOF>> {
+  yylval.error_msg = "EOF in STRING!";
+  return (ERROR);
+}
+
+<STRING>"\0" {
+  yylval.error_msg = "\\0 in STRING!";
+  return (ERROR);
+}
+
+ /* any normal contents in string */
+<STRING>[^\\\"\n]* {
+  yymore();
+}
+
+ /* \ in string and followed by a \n denotes change line */
+<STRING>\\\n {
+  curr_lineno++;
+  yymore();
+}
+
+<STRING>"\n" {
+  yylval.error_msg = "\\n in STRING without \\ !";
+  return (ERROR);
+}
+
+ /* end of string */
+<STRING>"\"" {
+
+}
 
  /* operators */
 <INITIAL>{LESSEQUAL}    { return (LE); }
