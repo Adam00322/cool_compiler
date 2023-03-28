@@ -69,6 +69,7 @@ ASSIGN          <-
 LESSEQUAL       <=
 %x COMMENTS
 %x STRING
+%option noyywrap
 
 %%
  /* begin of rules */
@@ -94,7 +95,8 @@ LESSEQUAL       <=
 }
 
 <COMMENTS><<EOF>> {
-  yylval.error_msg = "EOF in COMMENTS!";
+  yylval.error_msg = "EOF in comment";
+  BEGIN(INITIAL);
   return (ERROR);
 }
 
@@ -166,11 +168,7 @@ LESSEQUAL       <=
 
 <STRING><<EOF>> {
   yylval.error_msg = "EOF in STRING!";
-  return (ERROR);
-}
-
-<STRING>"\0" {
-  yylval.error_msg = "\\0 in STRING!";
+  BEGIN(INITIAL);
   return (ERROR);
 }
 
@@ -180,19 +178,63 @@ LESSEQUAL       <=
 }
 
  /* \ in string and followed by a \n denotes change line */
-<STRING>\\\n {
+<STRING>"\\\n" {
   curr_lineno++;
+  yymore();
+}
+
+<STRING>"\\" {
   yymore();
 }
 
 <STRING>"\n" {
   yylval.error_msg = "\\n in STRING without \\ !";
+  BEGIN(INITIAL);
   return (ERROR);
 }
 
  /* end of string */
 <STRING>"\"" {
-
+  std::string raw_str(yytext, yyleng);
+  raw_str = raw_str.substr(0, raw_str.length()-1);
+  std::string ret_str = "";
+  size_t len = raw_str.size();
+  size_t pre = 0;
+  for(size_t i=0; i<len; ++i) {
+    if(raw_str[i] == '\\') {
+      ret_str += raw_str.substr(pre, i-pre);
+      pre = i+2;
+      if(i+1<len) {
+        char c = raw_str[i+1];
+        switch(c) {
+          case 'b':
+            ret_str += "\b";
+            break;
+          case 't':
+            ret_str += "\t";
+            break;
+          case 'n':
+            ret_str += "\n";
+            break;
+          case 'f':
+            ret_str += "\f";
+            break;
+          default:
+            ret_str += c;
+            break;
+        }
+      }
+    }
+  }
+  ret_str += raw_str.substr(pre, len - pre);
+  if(ret_str.size() >= MAX_STR_CONST) {
+    cool_yylval.error_msg = "String too long";
+    BEGIN(INITIAL);
+    return (ERROR);
+  }
+  cool_yylval.symbol = stringtable.add_string((char *)ret_str.c_str());
+  BEGIN(INITIAL);
+  return STR_CONST;
 }
 
  /* operators */
