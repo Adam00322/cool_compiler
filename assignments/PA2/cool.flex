@@ -199,13 +199,11 @@ LESSEQUAL       <=
   raw_str = raw_str.substr(0, raw_str.length()-1);
   std::string ret_str = "";
   size_t len = raw_str.size();
-  size_t pre = 0;
   for(size_t i=0; i<len; ++i) {
     if(raw_str[i] == '\\') {
-      ret_str += raw_str.substr(pre, i-pre);
-      pre = i+2;
       if(i+1<len) {
-        char c = raw_str[i+1];
+        i++;
+        char c = raw_str[i];
         switch(c) {
           case 'b':
             ret_str += "\b";
@@ -223,10 +221,13 @@ LESSEQUAL       <=
             ret_str += c;
             break;
         }
+      }else{
+        ret_str += raw_str[i];
       }
+    }else{
+      ret_str += raw_str[i];
     }
   }
-  ret_str += raw_str.substr(pre, len - pre);
   if(ret_str.size() >= MAX_STR_CONST) {
     cool_yylval.error_msg = "String too long";
     BEGIN(INITIAL);
