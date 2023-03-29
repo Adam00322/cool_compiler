@@ -105,7 +105,7 @@ LESSEQUAL       <=
 <COMMENTS>[(*)] { }
 
 <INITIAL>"*)" {
-  yylval.error_msg = "get *) without (* ahead!";
+  yylval.error_msg = "Unmatched *)";
   return (ERROR);
 }
 
@@ -167,7 +167,7 @@ LESSEQUAL       <=
 }
 
 <STRING><<EOF>> {
-  yylval.error_msg = "EOF in STRING!";
+  yylval.error_msg = "EOF in string constant";
   BEGIN(INITIAL);
   return (ERROR);
 }
@@ -183,12 +183,21 @@ LESSEQUAL       <=
   yymore();
 }
 
+<STRING>"\\\"" {
+  yymore();
+}
+
+<STRING>"\\\\" {
+  yymore();
+}
+
 <STRING>"\\" {
   yymore();
 }
 
 <STRING>"\n" {
-  yylval.error_msg = "\\n in STRING without \\ !";
+  yylval.error_msg = "Unterminated string constant";
+  curr_lineno++;
   BEGIN(INITIAL);
   return (ERROR);
 }
@@ -229,7 +238,7 @@ LESSEQUAL       <=
     }
   }
   if(ret_str.size() >= MAX_STR_CONST) {
-    cool_yylval.error_msg = "String too long";
+    cool_yylval.error_msg = "String constant too long";
     BEGIN(INITIAL);
     return (ERROR);
   }
