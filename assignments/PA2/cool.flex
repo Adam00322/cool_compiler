@@ -326,7 +326,7 @@ LESSEQUAL       <=
 }
 
  /* if all are not match, then error */
-[^\n] {
+. {
   cool_yylval.error_msg = yytext;
   return (ERROR);
 }
