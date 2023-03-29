@@ -209,7 +209,11 @@ LESSEQUAL       <=
   std::string ret_str = "";
   size_t len = raw_str.size();
   for(size_t i=0; i<len; ++i) {
-    if(raw_str[i] == '\\') {
+    if(raw_str[i] == '\0') {
+      cool_yylval.error_msg = "String contains null character.";
+      BEGIN(INITIAL);
+      return (ERROR);
+    }else if(raw_str[i] == '\\') {
       if(i+1<len) {
         i++;
         char c = raw_str[i];
