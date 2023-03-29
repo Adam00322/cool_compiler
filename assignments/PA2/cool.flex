@@ -45,6 +45,7 @@ extern YYSTYPE cool_yylval;
  */
 
 static int comment_nested_num = 0;
+static int escape_cnt = 0;
 %}
  /* begin of definitions */
  /*
@@ -69,6 +70,7 @@ ASSIGN          <-
 LESSEQUAL       <=
 %x COMMENTS
 %x STRING
+%x STRING_ERROR
 %option noyywrap
 
 %%
@@ -95,7 +97,7 @@ LESSEQUAL       <=
 }
 
 <COMMENTS><<EOF>> {
-  yylval.error_msg = "EOF in comment";
+  cool_yylval.error_msg = "EOF in comment";
   BEGIN(INITIAL);
   return (ERROR);
 }
@@ -105,7 +107,7 @@ LESSEQUAL       <=
 <COMMENTS>[(*)] { }
 
 <INITIAL>"*)" {
-  yylval.error_msg = "Unmatched *)";
+  cool_yylval.error_msg = "Unmatched *)";
   return (ERROR);
 }
 
@@ -167,40 +169,92 @@ LESSEQUAL       <=
 }
 
 <STRING><<EOF>> {
-  yylval.error_msg = "EOF in string constant";
+  cool_yylval.error_msg = "EOF in string constant";
   BEGIN(INITIAL);
+  yyrestart(yyin);
+  return (ERROR);
+}
+
+<STRING>"\0" {
+  cool_yylval.error_msg = "String contains null character.";
+  BEGIN(STRING_ERROR);
   return (ERROR);
 }
 
  /* any normal contents in string */
-<STRING>[^\\\"\n]* {
+<STRING>[^\0\\\"\n]* {
+  if(yyleng - escape_cnt >= MAX_STR_CONST) {
+    cool_yylval.error_msg = "String constant too long";
+    BEGIN(STRING_ERROR);
+    return (ERROR);
+  }
   yymore();
 }
 
  /* \ in string and followed by a \n denotes change line */
 <STRING>"\\\n" {
   curr_lineno++;
+  escape_cnt++;
+  if(yyleng - escape_cnt >= MAX_STR_CONST) {
+    cool_yylval.error_msg = "String constant too long";
+    BEGIN(STRING_ERROR);
+    return (ERROR);
+  }
   yymore();
 }
 
 <STRING>"\\\"" {
+  escape_cnt++;
+  if(yyleng - escape_cnt >= MAX_STR_CONST) {
+    cool_yylval.error_msg = "String constant too long";
+    BEGIN(STRING_ERROR);
+    return (ERROR);
+  }
   yymore();
 }
 
 <STRING>"\\\\" {
+  escape_cnt++;
+  if(yyleng - escape_cnt >= MAX_STR_CONST) {
+    cool_yylval.error_msg = "String constant too long";
+    BEGIN(STRING_ERROR);
+    return (ERROR);
+  }
   yymore();
 }
 
 <STRING>"\\" {
+  escape_cnt++;
   yymore();
 }
 
 <STRING>"\n" {
-  yylval.error_msg = "Unterminated string constant";
+  cool_yylval.error_msg = "Unterminated string constant";
   curr_lineno++;
   BEGIN(INITIAL);
   return (ERROR);
 }
+
+<STRING_ERROR><<EOF>> { 
+  yyterminate();
+}
+
+<STRING_ERROR>"\\\n" {
+  curr_lineno++;
+}
+
+<STRING_ERROR>"\n" {
+  curr_lineno++;
+  BEGIN(INITIAL);
+}
+
+<STRING_ERROR>"\"" {
+  BEGIN(INITIAL);
+}
+
+<STRING_ERROR>[^\\\"\n]* { }
+
+<STRING_ERROR>(?:\\\\|\\|\\\") { }
 
  /* end of string */
 <STRING>"\"" {
@@ -209,11 +263,7 @@ LESSEQUAL       <=
   std::string ret_str = "";
   size_t len = raw_str.size();
   for(size_t i=0; i<len; ++i) {
-    if(raw_str[i] == '\0') {
-      cool_yylval.error_msg = "String contains null character.";
-      BEGIN(INITIAL);
-      return (ERROR);
-    }else if(raw_str[i] == '\\') {
+    if(raw_str[i] == '\\') {
       if(i+1<len) {
         i++;
         char c = raw_str[i];
@@ -240,11 +290,6 @@ LESSEQUAL       <=
     }else{
       ret_str += raw_str[i];
     }
-  }
-  if(ret_str.size() >= MAX_STR_CONST) {
-    cool_yylval.error_msg = "String constant too long";
-    BEGIN(INITIAL);
-    return (ERROR);
   }
   cool_yylval.symbol = stringtable.add_string((char *)ret_str.c_str());
   BEGIN(INITIAL);
@@ -281,8 +326,8 @@ LESSEQUAL       <=
 }
 
  /* if all are not match, then error */
-<INITIAL>[^\n] {
-  yylval.error_msg = yytext;
+[^\n] {
+  cool_yylval.error_msg = yytext;
   return (ERROR);
 }
 
