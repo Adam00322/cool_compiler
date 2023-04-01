@@ -166,6 +166,7 @@ LESSEQUAL       <=
   /* start of string */
 <INITIAL>"\"" {
   BEGIN(STRING);
+  escape_cnt = 0;
 }
 
 <STRING><<EOF>> {
