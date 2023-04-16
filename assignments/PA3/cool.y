@@ -133,20 +133,42 @@
     %type <program> program
     %type <classes> class_list
     %type <class_> class
+    //TODO:
+    %type <features> feature_list
+    %type <feature> feature
+    %type <formals> formal_list
+    %type <formal> formal   
+    %type <cases> branch_list
+    %type <case_> branch
+    %type <expressions> exp_list
+    %type <expression> exp
     
     /* You will want to change the following line. */
     %type <features> dummy_feature_list
     
     /* Precedence declarations go here. */
-    
+    //TODO:
+    %right ASSIGN
+    %left NOT
+    %nonassoc LE '<' '='
+    %left '+' '-'
+    %left '*' '/'
+    %left ISVOID
+    %left '~'
+    %left '@'
+    %left '.'
     
     %%
     /* 
     Save the root of the abstract syntax tree in a global variable.
     */
-    program	: class_list	{ @$ = @1; ast_root = program($1); }
+    /*-- program --*/
+    program	
+    : class_list	
+    { @$ = @1; ast_root = program($1); }
     ;
     
+    /*-- class --*/
     class_list
     : class			/* single class */
     { $$ = single_Classes($1);
@@ -157,17 +179,19 @@
     ;
     
     /* If no parent is specified, the class inherits from the Object class. */
-    class	: CLASS TYPEID '{' dummy_feature_list '}' ';'
+    class	
+    : CLASS TYPEID '{' dummy_feature_list '}' ';'
     { $$ = class_($2,idtable.add_string("Object"),$4,
     stringtable.add_string(curr_filename)); }
     | CLASS TYPEID INHERITS TYPEID '{' dummy_feature_list '}' ';'
     { $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); }
     ;
     
+    /*-- feature --*/
     /* Feature list may be empty, but no empty features in list. */
     dummy_feature_list:		/* empty */
     {  $$ = nil_Features(); }
-    
+    //TODO:
     
     /* end of grammar */
     %%
