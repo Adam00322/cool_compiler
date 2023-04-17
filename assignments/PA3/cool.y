@@ -138,13 +138,10 @@
     %type <feature> feature
     %type <formals> formal_list
     %type <formal> formal   
-    %type <cases> branch_list
-    %type <case_> branch
-    %type <expressions> exp_list
-    %type <expression> exp
-    
-    /* You will want to change the following line. */
-    %type <features> dummy_feature_list
+    %type <cases> case_list
+    %type <case_> case
+    %type <expressions> expression_list
+    %type <expression> expression
     
     /* Precedence declarations go here. */
     //TODO:
@@ -171,26 +168,68 @@
     /*-- class --*/
     class_list
     : class			/* single class */
-    { $$ = single_Classes($1);
-    parse_results = $$; }
+    { $$ = single_Classes($1); parse_results = $$; }
     | class_list class	/* several classes */
     { $$ = append_Classes($1,single_Classes($2)); 
     parse_results = $$; }
+    | error ';' class_list
+    { $$ = $3; }
     ;
     
     /* If no parent is specified, the class inherits from the Object class. */
     class	
-    : CLASS TYPEID '{' dummy_feature_list '}' ';'
-    { $$ = class_($2,idtable.add_string("Object"),$4,
-    stringtable.add_string(curr_filename)); }
-    | CLASS TYPEID INHERITS TYPEID '{' dummy_feature_list '}' ';'
-    { $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); }
+    : CLASS TYPEID '{' feature_list '}' ';'
+    { $$ = class_($2, idtable.add_string("Object"), $4, stringtable.add_string(curr_filename)); }
+    | CLASS TYPEID INHERITS TYPEID '{' feature_list '}' ';'
+    { $$ = class_($2, $4, $6, stringtable.add_string(curr_filename)); }
     ;
     
     /*-- feature --*/
     /* Feature list may be empty, but no empty features in list. */
-    dummy_feature_list:		/* empty */
+    feature_list:		/* empty */
     {  $$ = nil_Features(); }
+    | feature
+    { $$ = single_Features($1); }
+    | feature_list feature
+    { $$ = append_Features($1, single_Features($2)); }
+    | error ';' feature_list                        
+    { $$ = $3; }                                                                           
+
+    feature
+    : OBJECTID '(' ')' ':' TYPEID '{' expression '}' ';'
+    { $$ = method($1, nil_Formals(), $5, $7); }
+    | OBJECTID '(' formal_list ')' ':' TYPEID '{' expression '}' ';'
+    { $$ = method($1, $3, $6, $8); }
+    | OBJECTID ':' TYPEID ';'
+    { $$ = attr($1, $3, no_expr()); }
+    | OBJECTID ':' TYPEID ASSIGN expression ';'
+    { $$ = attr($1, $3, $5); }
+
+    /* formal */
+    formal_list:
+    { $$ = nil_Formals(); }
+    | formal
+    { $$ = single_Formals($1); }
+    | formal_list formal
+    { $$ = append_Formals($1, single_Formals($2)); }
+
+    formal
+    : OBJECTID ':' TYPEID
+    { $$ = formal($1, $3); }
+
+    /* case */
+    case_list
+    : case
+    { $$ = single_Cases($1); }
+    | case_list case
+    { $$ = append_Cases($1, single_Cases($2)); }
+    
+    case
+    : OBJECTID ':' TYPEID DARROW exporession ';'
+    { $$ = branch($1, $3, $5); }
+
+    /* expression */                                                          
+
     //TODO:
     
     /* end of grammar */
