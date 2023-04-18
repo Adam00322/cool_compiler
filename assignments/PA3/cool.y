@@ -14,8 +14,7 @@
   
   /* Locations */
   #define YYLTYPE int              /* the type of locations */
-  #define cool_yylloc curr_lineno  /* use the curr_lineno from the lexer
-  for the location of tokens */
+  #define cool_yylloc curr_lineno  /* use the curr_lineno from the lexer for the location of tokens */
     
     extern int node_lineno;          /* set before constructing a tree node
     to whatever you want the line number
@@ -51,7 +50,7 @@
       // Set the line number of the current non-terminal:
       // ***********************************************
       // You can access the line numbers of the i'th item with @i, just
-      // like you acess the value of the i'th exporession with $i.
+      // like you acess the value of the i'th expression with $i.
       //
       // Here, we choose the line number of the last INT_CONST (@3) as the
       // line number of the resulting expression (@$). You are free to pick
@@ -141,7 +140,9 @@
     %type <cases> case_list
     %type <case_> case
     %type <expressions> expression_list
+    %type <expressions> formal_expression_list
     %type <expression> expression
+    %type <expression> let_expression
     
     /* Precedence declarations go here. */
     //TODO:
@@ -186,14 +187,16 @@
     
     /*-- feature --*/
     /* Feature list may be empty, but no empty features in list. */
-    feature_list:		/* empty */
-    {  $$ = nil_Features(); }
+    feature_list
+    :	/* empty */
+    { $$ = nil_Features(); }
     | feature
     { $$ = single_Features($1); }
     | feature_list feature
     { $$ = append_Features($1, single_Features($2)); }
     | error ';' feature_list                        
-    { $$ = $3; }                                                                           
+    { $$ = $3; }
+    ;                                                                           
 
     feature
     : OBJECTID '(' ')' ':' TYPEID '{' expression '}' ';'
@@ -204,18 +207,22 @@
     { $$ = attr($1, $3, no_expr()); }
     | OBJECTID ':' TYPEID ASSIGN expression ';'
     { $$ = attr($1, $3, $5); }
+    ;
 
     /* formal */
-    formal_list:
+    formal_list
+    : /* empty */
     { $$ = nil_Formals(); }
     | formal
     { $$ = single_Formals($1); }
-    | formal_list formal
-    { $$ = append_Formals($1, single_Formals($2)); }
+    | formal_list ',' formal
+    { $$ = append_Formals($1, single_Formals($3)); }
+    ;
 
     formal
     : OBJECTID ':' TYPEID
     { $$ = formal($1, $3); }
+    ;
 
     /* case */
     case_list
@@ -223,15 +230,98 @@
     { $$ = single_Cases($1); }
     | case_list case
     { $$ = append_Cases($1, single_Cases($2)); }
+    ;
     
     case
-    : OBJECTID ':' TYPEID DARROW exporession ';'
+    : OBJECTID ':' TYPEID DARROW expression ';'
     { $$ = branch($1, $3, $5); }
+    ;
 
-    /* expression */                                                          
+    /* expression */
+    expression_list
+    : expression ';'
+    { $$ = single_Expressions($1); }
+    | expression_list expression ';'
+    { $$ = append_Expressions($1, single_Expressions($2)); }
+    | error ';' expression_list
+    { $$ = $3; }
+    ;
 
-    //TODO:
-    
+    formal_expression_list
+    : /* empty */
+    { $$ = nil_Expressions(); }
+    | expression
+    { $$ = single_Expressions($1); }
+    | formal_expression_list ',' expression
+    { $$ = append_Expressions($1, single_Expressions($3)); }                                                      
+    ;
+
+    expression
+    : OBJECTID ASSIGN expression
+    { $$ = assign($1, $3); }
+    | expression '.' OBJECTID '(' formal_expression_list ')'
+    { $$ = dispatch($1, $3, $5); }
+    | expression '@' TYPEID '.' OBJECTID '(' formal_expression_list ')'
+    { $$ = static_dispatch($1, $3, $5, $7); }
+    | OBJECTID '(' formal_expression_list ')'
+    { $$ = dispatch(object(idtable.add_string("self")), $1, $3); }
+    | IF expression THEN expression ELSE expression FI
+    { $$ = cond($2, $4, $6); }
+    | WHILE expression LOOP expression POOL
+    { $$ = loop($2, $4); }
+    | '{' expression_list '}'
+    { $$ = block($2); }
+    | LET let_expression
+    { $$ = $2; }
+    | CASE expression OF case_list ESAC
+    { $$ = typcase($2, $4); }
+    | NEW TYPEID
+    { $$ = new_($2); }
+    | ISVOID expression
+    { $$ = isvoid($2); }
+    | expression '+' expression
+    { $$ = plus($1, $3); }
+    | expression '-' expression
+    { $$ = sub($1, $3); }
+    | expression '*' expression
+    { $$ = mul($1, $3); }
+    | expression '/' expression
+    { $$ = divide($1, $3); }
+    | '~' expression
+    { $$ = neg($2); }
+    | expression '<' expression
+    { $$ = lt($1, $3); }
+    | expression LE expression
+    { $$ = leq($1, $3); }
+    | expression '=' expression
+    { $$ = eq($1, $3); }
+    | NOT expression
+    { $$ = comp($2); }
+    | '(' expression ')'
+    { $$ = $2; }
+    | OBJECTID
+    { $$ = object($1); }
+    | INT_CONST
+    { $$ = int_const($1); }
+    | STR_CONST
+    { $$ = string_const($1); }
+    | BOOL_CONST
+    { $$ = bool_const($1); }
+    ;
+
+    let_expression
+    : OBJECTID ':' TYPEID IN expression
+    { $$ = let($1, $3, no_expr(), $5); }
+    | OBJECTID ':' TYPEID ASSIGN expression IN expression
+    { $$ = let($1, $3, $5, $7); }
+    | OBJECTID ':' TYPEID ',' let_expression
+    { $$ = let($1, $3, no_expr(), $5); }
+    | OBJECTID ':' TYPEID ASSIGN expression ',' let_expression
+    { $$ = let($1, $3, $5, $7); }
+    | error ',' let_expression
+    { $$ = $3; }
+    ;
+
     /* end of grammar */
     %%
     
