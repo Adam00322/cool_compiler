@@ -136,16 +136,19 @@
     %type <features> feature_list
     %type <feature> feature
     %type <formals> formal_list
+    %type <formals> nonempty_formal_list
     %type <formal> formal   
     %type <cases> case_list
     %type <case_> case
     %type <expressions> expression_list
     %type <expressions> formal_expression_list
+    %type <expressions> nonempty_formal_expression_list
     %type <expression> expression
     %type <expression> let_expression
     
     /* Precedence declarations go here. */
     //TODO:
+    %right IN
     %right ASSIGN
     %left NOT
     %nonassoc LE '<' '='
@@ -173,8 +176,6 @@
     | class_list class	/* several classes */
     { $$ = append_Classes($1,single_Classes($2)); 
     parse_results = $$; }
-    | error ';' class_list
-    { $$ = $3; }
     ;
     
     /* If no parent is specified, the class inherits from the Object class. */
@@ -183,6 +184,8 @@
     { $$ = class_($2, idtable.add_string("Object"), $4, stringtable.add_string(curr_filename)); }
     | CLASS TYPEID INHERITS TYPEID '{' feature_list '}' ';'
     { $$ = class_($2, $4, $6, stringtable.add_string(curr_filename)); }
+    | error ';' 
+    { yyerrok; }
     ;
     
     /*-- feature --*/
@@ -190,22 +193,18 @@
     feature_list
     :	/* empty */
     { $$ = nil_Features(); }
-    | feature
-    { $$ = single_Features($1); }
-    | feature_list feature
-    { $$ = append_Features($1, single_Features($2)); }
-    | error ';' feature_list                        
-    { $$ = $3; }
+    | feature ';' feature_list
+    { $$ = append_Features(single_Features($1), $3); }
+    | error ';' feature_list
+    { $$ = $3; yyerrok; }
     ;                                                                           
 
     feature
-    : OBJECTID '(' ')' ':' TYPEID '{' expression '}' ';'
-    { $$ = method($1, nil_Formals(), $5, $7); }
-    | OBJECTID '(' formal_list ')' ':' TYPEID '{' expression '}' ';'
+    : OBJECTID '(' formal_list ')' ':' TYPEID '{' expression '}'
     { $$ = method($1, $3, $6, $8); }
-    | OBJECTID ':' TYPEID ';'
+    | OBJECTID ':' TYPEID
     { $$ = attr($1, $3, no_expr()); }
-    | OBJECTID ':' TYPEID ASSIGN expression ';'
+    | OBJECTID ':' TYPEID ASSIGN expression
     { $$ = attr($1, $3, $5); }
     ;
 
@@ -213,10 +212,15 @@
     formal_list
     : /* empty */
     { $$ = nil_Formals(); }
-    | formal
+    | nonempty_formal_list
+    { $$ = $1; }
+    
+
+    nonempty_formal_list
+    : formal
     { $$ = single_Formals($1); }
-    | formal_list ',' formal
-    { $$ = append_Formals($1, single_Formals($3)); }
+    | formal ',' nonempty_formal_list
+    { $$ = append_Formals(single_Formals($1), $3); }
     ;
 
     formal
@@ -241,19 +245,23 @@
     expression_list
     : expression ';'
     { $$ = single_Expressions($1); }
-    | expression_list expression ';'
-    { $$ = append_Expressions($1, single_Expressions($2)); }
+    | expression ';' expression_list
+    { $$ = append_Expressions(single_Expressions($1), $3); }
     | error ';' expression_list
-    { $$ = $3; }
+    { $$ = $3; yyerrok; }
     ;
 
     formal_expression_list
     : /* empty */
     { $$ = nil_Expressions(); }
-    | expression
+    | nonempty_formal_expression_list
+    { $$ = $1; }
+
+    nonempty_formal_expression_list
+    : expression
     { $$ = single_Expressions($1); }
-    | formal_expression_list ',' expression
-    { $$ = append_Expressions($1, single_Expressions($3)); }                                                      
+    | expression ',' nonempty_formal_expression_list
+    { $$ = append_Expressions(single_Expressions($1), $3); }                                                      
     ;
 
     expression
@@ -319,7 +327,7 @@
     | OBJECTID ':' TYPEID ASSIGN expression ',' let_expression
     { $$ = let($1, $3, $5, $7); }
     | error ',' let_expression
-    { $$ = $3; }
+    { $$ = $3; yyerrok; }
     ;
 
     /* end of grammar */
