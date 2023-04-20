@@ -1,4 +1,8 @@
 #!/bin/bash
+make clean
+make
+bison cool.y
+make parser
 if [ -e check_mine.txt ]; then 
   rm check_mine.txt 
 fi

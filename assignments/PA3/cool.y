@@ -192,20 +192,20 @@
     /* Feature list may be empty, but no empty features in list. */
     feature_list
     :	/* empty */
-    { $$ = nil_Features(); }
-    | feature ';' feature_list
-    { $$ = append_Features(single_Features($1), $3); }
-    | error ';' feature_list
-    { $$ = $3; yyerrok; }
+    { SET_NODELOC(0); $$ = nil_Features(); }
+    | feature_list feature 
+    { $$ = append_Features($1, single_Features($2)); }
     ;                                                                           
 
     feature
-    : OBJECTID '(' formal_list ')' ':' TYPEID '{' expression '}'
+    : OBJECTID '(' formal_list ')' ':' TYPEID '{' expression '}' ';'
     { $$ = method($1, $3, $6, $8); }
-    | OBJECTID ':' TYPEID
-    { $$ = attr($1, $3, no_expr()); }
-    | OBJECTID ':' TYPEID ASSIGN expression
+    | OBJECTID ':' TYPEID ';'
+    { SET_NODELOC(0); $$ = attr($1, $3, no_expr()); }
+    | OBJECTID ':' TYPEID ASSIGN expression ';'
     { $$ = attr($1, $3, $5); }
+    | error ';'
+    { }
     ;
 
     /* formal */
@@ -245,10 +245,12 @@
     expression_list
     : expression ';'
     { $$ = single_Expressions($1); }
-    | expression ';' expression_list
-    { $$ = append_Expressions(single_Expressions($1), $3); }
-    | error ';' expression_list
-    { $$ = $3; yyerrok; }
+    |  expression_list expression ';'
+    { $$ = append_Expressions($1, single_Expressions($2)); }
+    | error ';'
+    { yyerrok; }
+    //TODO:
+    // last expr with error
     ;
 
     formal_expression_list
@@ -328,6 +330,10 @@
     { $$ = let($1, $3, $5, $7); }
     | error ',' let_expression
     { $$ = $3; yyerrok; }
+    //TODO:
+    // error before IN
+    | error IN expression
+    { }
     ;
 
     /* end of grammar */
