@@ -19,8 +19,11 @@ Class E inherits A {
 ;
 
 class F inherits A {
+    test0() : Int {
+        1
+    };
 	test1() : Int {
-		let i : int <- 1, j : string in i
+		let i : int <- 1, j : string in {A;}
 	};
 	test2() : int { 1 };
 	test3() : Int {
@@ -44,6 +47,9 @@ class F inherits A {
         new 111
     };
     test7() : Int {
+    };
+    test8() : Int {
+        if 1 then 2 fi
     };
     Double : Int;
 };

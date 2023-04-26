@@ -250,8 +250,6 @@
     { $$ = append_Expressions($1, single_Expressions($2)); }
     | error ';'
     { yyerrok; }
-    //TODO:
-    // last expr with error
     ;
 
     formal_expression_list
@@ -331,10 +329,8 @@
     { $$ = let($1, $3, $5, $7); }
     | error ',' let_expression
     { $$ = $3; yyerrok; }
-    //TODO:
-    // error before IN
     | error IN expression
-    { }
+    { yyerrok; }
     ;
 
     /* end of grammar */
