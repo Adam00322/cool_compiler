@@ -74,6 +74,7 @@
     
     
     void yyerror(char *s);        /*  defined below; called for each parse error */
+    Expression zero_no_expr();
     extern int yylex();           /*  the entry point to the lexer  */
     
     /************************************************************************/
@@ -192,7 +193,7 @@
     /* Feature list may be empty, but no empty features in list. */
     feature_list
     :	/* empty */
-    { SET_NODELOC(0); $$ = nil_Features(); }
+    { $$ = nil_Features(); }
     | feature_list feature 
     { $$ = append_Features($1, single_Features($2)); }
     ;                                                                           
@@ -201,7 +202,7 @@
     : OBJECTID '(' formal_list ')' ':' TYPEID '{' expression '}' ';'
     { $$ = method($1, $3, $6, $8); }
     | OBJECTID ':' TYPEID ';'
-    { SET_NODELOC(0); $$ = attr($1, $3, no_expr()); }
+    { $$ = attr($1, $3, zero_no_expr()); }
     | OBJECTID ':' TYPEID ASSIGN expression ';'
     { $$ = attr($1, $3, $5); }
     | error ';'
@@ -321,11 +322,11 @@
 
     let_expression
     : OBJECTID ':' TYPEID IN expression
-    { $$ = let($1, $3, no_expr(), $5); }
+    { $$ = let($1, $3, zero_no_expr(), $5); }
     | OBJECTID ':' TYPEID ASSIGN expression IN expression
     { $$ = let($1, $3, $5, $7); }
     | OBJECTID ':' TYPEID ',' let_expression
-    { $$ = let($1, $3, no_expr(), $5); }
+    { $$ = let($1, $3, zero_no_expr(), $5); }
     | OBJECTID ':' TYPEID ASSIGN expression ',' let_expression
     { $$ = let($1, $3, $5, $7); }
     | error ',' let_expression
@@ -351,6 +352,15 @@
       omerrs++;
       
       if(omerrs>50) {fprintf(stdout, "More than 50 errors\n"); exit(1);}
+    }
+
+    Expression zero_no_expr()
+    {
+      int t = node_lineno;
+      node_lineno = 0;
+      Expression ne = no_expr();
+      node_lineno = t;
+      return ne;
     }
     
     
