@@ -385,32 +385,6 @@ attr_class* get_class_attr(Symbol class_name, Symbol attr_name) {
     return attrs[attr_name];
 }
 
-void ensure_class_attributes_are_unique(Class_ class_definition) {
-    std::set<Symbol> class_attrs;
-    Symbol class_name = class_definition->get_name();
-    Features class_features = class_definition->get_features();
-
-    for (int i = class_features->first(); class_features->more(i); i = class_features->next(i)) 
-    {
-        Feature feature = class_features->nth(i);
-
-        if (!feature->is_attr())
-            continue;
-
-        attr_class* attr = static_cast<attr_class*>(feature);
-        Symbol attr_name = attr->get_name();
-        
-        if (class_attrs.find(attr_name) != class_attrs.end())
-        {
-            class_table->semant_error(class_definition)
-                << "The attribute :"
-                << attr_name
-                << " has already been defined!\n";
-        }
-        class_attrs.insert(attr_name);
-    }
-}
-
 std::map<Symbol, attr_class*> get_class_attributes(Class_ class_definition) {
     std::map<Symbol, attr_class*> class_attrs;
     Symbol class_name = class_definition->get_name();
@@ -425,6 +399,13 @@ std::map<Symbol, attr_class*> get_class_attributes(Class_ class_definition) {
 
         attr_class* attr = static_cast<attr_class*>(feature);
         Symbol attr_name = attr->get_name();
+        if (class_attrs.find(attr_name) != class_attrs.end())
+        {
+            class_table->semant_error(class_definition)
+                << "The attribute :"
+                << attr_name
+                << " has already been defined!\n";
+        }
         class_attrs[attr_name] = attr;
     }
 
@@ -433,7 +414,7 @@ std::map<Symbol, attr_class*> get_class_attributes(Class_ class_definition) {
 
 
 void build_attribute_scopes(Class_ current_class) {
-    std::map<Symbol, attr_class*> attrs = get_class_attributes(current_class);
+    const auto& attrs = class_attrs[current_class->get_name()];
     for(const auto &x : attrs) {
         attr_class* attr_definition = x.second;
         if(attr_definition->get_name() == self){
@@ -466,10 +447,10 @@ void build_attribute_scopes(Class_ current_class) {
     build_attribute_scopes(parent_definition);
 }
 
-void process_attr(Class_ origin_calss, Class_ current_class, attr_class* attr) {
+void process_attr(Class_ origin_class, Class_ current_class, attr_class* attr) {
     if (get_class_attr(current_class->get_name(), attr->get_name()) != nullptr)
     {
-        class_table->semant_error(origin_calss) 
+        class_table->semant_error(origin_class) 
             << "Attribute " 
             << attr->get_name()
             << " is an attribute of an inherited class.\n";
@@ -482,7 +463,7 @@ void process_attr(Class_ origin_calss, Class_ current_class, attr_class* attr) {
 
     Symbol parent_type_name = current_class->get_parent_name();
     Class_ parent_definition = class_table->class_map[parent_type_name];
-    process_attr(origin_calss, parent_definition, attr);
+    process_attr(origin_class, parent_definition, attr);
 }
 
 void process_method(Class_ current_class, method_class* original_method, method_class* parent_method) {
@@ -583,9 +564,8 @@ void ClassTable::type_check(Classes classes) {
     for(int i = classes->first(); classes->more(i); i = classes->next(i)) {
         current_class = classes->nth(i);
 
-        auto current_class_methods = class_methods[current_class->get_name()];
-        ensure_class_attributes_are_unique(current_class);
-        auto current_class_attrs = class_attrs[current_class->get_name()];
+        const auto& current_class_methods = class_methods[current_class->get_name()];
+        const auto& current_class_attrs = class_attrs[current_class->get_name()];
 
         objects_table->enterscope();
         objects_table->addid(self, new Symbol(current_class->get_name()));
