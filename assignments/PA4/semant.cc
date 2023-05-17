@@ -16,8 +16,6 @@ ClassTable *class_table;
 SymbolTable<Symbol,Symbol> *objects_table;
 
 Class_ current_class;
-std::map<Symbol, method_class*> current_class_methods;
-std::map<Symbol, attr_class*> current_class_attrs;
 
 std::map<Symbol, std::map<Symbol, method_class*>> class_methods;
 std::map<Symbol, std::map<Symbol, attr_class*>> class_attrs;
@@ -295,6 +293,12 @@ bool ClassTable::is_subclass(Symbol type1, Symbol type2) {
     if (type1 == No_type)
         return true;
 
+    if (type1 == SELF_TYPE)
+        type1 = current_class->get_name();
+
+    if (type2 == SELF_TYPE)
+        type2 = current_class->get_name();
+
     while (type1 != Object && type1 != type2)
         type1 = parent_map[type1];
 
@@ -304,6 +308,14 @@ bool ClassTable::is_subclass(Symbol type1, Symbol type2) {
 Symbol ClassTable::get_lca(Symbol type1, Symbol type2) {
     std::set<Symbol> ancestors;
     Symbol lca = Object;
+    if(type1 == type2) return type1;
+
+    if (type1 == SELF_TYPE)
+        type1 = current_class->get_name();
+
+    if (type2 == SELF_TYPE)
+        type2 = current_class->get_name();
+
     while (type1 != Object) {
         ancestors.insert(type1);
         type1 = parent_map[type1];
@@ -317,7 +329,7 @@ Symbol ClassTable::get_lca(Symbol type1, Symbol type2) {
         type2 = parent_map[type2];
     }
 
-    return Object;
+    return lca;
 }
 
 /*
@@ -425,19 +437,19 @@ void build_attribute_scopes(Class_ current_class) {
     for(const auto &x : attrs) {
         attr_class* attr_definition = x.second;
         if(attr_definition->get_name() == self){
-            class_table->semant_error(current_class) 
-                << " Attribute " 
+            class_table->semant_error(attr_definition) 
+                << "Attribute " 
                 << attr_definition->get_name()
                 << " cannot be named self.\n";
                 continue;
         }
         if(attr_definition->get_type() != SELF_TYPE && class_table->class_map.find(attr_definition->get_type()) == class_table->class_map.end()){
-            class_table->semant_error(current_class) 
-                << " Attribute " 
-                << attr_definition->get_name()
-                << " has undefined type "
+            class_table->semant_error(attr_definition) 
+                << "Class "
                 << attr_definition->get_type()
-                << ".\n";
+                << " of attribute "
+                << attr_definition->get_name()
+                << " is undefined.\n";
                 continue;
         }
 
@@ -458,16 +470,17 @@ void process_attr(Class_ origin_calss, Class_ current_class, attr_class* attr) {
     if (get_class_attr(current_class->get_name(), attr->get_name()) != nullptr)
     {
         class_table->semant_error(origin_calss) 
-            << " Attribute " 
+            << "Attribute " 
             << attr->get_name()
             << " is an attribute of an inherited class.\n";
         cerr << "Compilation halted due to static semantic errors." << endl;
     }
 
-    Symbol parent_type_name = class_table->parent_map[current_class->get_name()];
-    if (parent_type_name == No_type)
+    if(current_class->get_name() == Object) {
         return;
+    }
 
+    Symbol parent_type_name = current_class->get_parent_name();
     Class_ parent_definition = class_table->class_map[parent_type_name];
     process_attr(origin_calss, parent_definition, attr);
 }
@@ -566,13 +579,13 @@ void ClassTable::register_class_and_its_methods() {
     TYPECHECKING
 */
 
-void ClassTable::type_check() {
-    for(auto& x : class_map) {
-        current_class = x.second;
+void ClassTable::type_check(Classes classes) {
+    for(int i = classes->first(); classes->more(i); i = classes->next(i)) {
+        current_class = classes->nth(i);
 
-        current_class_methods = get_class_methods(current_class);
+        auto current_class_methods = class_methods[current_class->get_name()];
         ensure_class_attributes_are_unique(current_class);
-        current_class_attrs = get_class_attributes(current_class);
+        auto current_class_attrs = class_attrs[current_class->get_name()];
 
         objects_table->enterscope();
         objects_table->addid(self, new Symbol(current_class->get_name()));
@@ -584,7 +597,7 @@ void ClassTable::type_check() {
         }
 
         for (const auto &x : current_class_attrs) {
-            Class_ parent_definition = class_table->class_map[class_table->parent_map[current_class->get_name()]];
+            Class_ parent_definition = class_table->class_map[current_class->get_parent_name()];
             process_attr(current_class, parent_definition, x.second);
         }
 
@@ -602,6 +615,11 @@ void ClassTable::type_check() {
 }
 
 Symbol object_class::type_check() {
+    if (name == self) {
+        this->set_type(SELF_TYPE);
+        return SELF_TYPE;
+    }
+
     Symbol* object_type = objects_table->lookup(name);
     if (object_type == nullptr) {
         class_table->semant_error(this) 
@@ -899,6 +917,7 @@ Symbol dispatch_class::type_check() {
             method = methods[name];
             break;
         }
+        t = class_table->class_map[t]->get_parent_name();
     }
 
     if (method == nullptr) {
@@ -922,9 +941,6 @@ Symbol dispatch_class::type_check() {
     for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
         auto actual_type = actual->nth(i)->type_check();
         auto formal_type = method->get_formals()->nth(i)->get_type();
-        if (actual_type == SELF_TYPE) {
-            actual_type = expr_type;
-        }
         if (!class_table->is_subclass(actual_type, formal_type)) {
             class_table->semant_error(this) 
                 << "In call of method " 
@@ -942,7 +958,7 @@ Symbol dispatch_class::type_check() {
     }
 
     this->set_type(method->get_return_type());
-    if (type == SELF_TYPE) {
+    if (type == SELF_TYPE && current_class->get_name() != expr_type) {
         type = expr_type;
     }
     return type;
@@ -1221,13 +1237,13 @@ void program_class::semant()
 
     objects_table = new SymbolTable<Symbol, Symbol>();
     class_table->check_main_class();
-    // class_table->register_class_and_its_methods();
-    // class_table->type_check();
+    class_table->register_class_and_its_methods();
+    class_table->type_check(classes);
 
-    // if (class_table->errors()) {
-    //     cerr << "Compilation halted due to static semantic errors." << endl;
-    //     exit(1);
-    // }
+    if (class_table->errors()) {
+        cerr << "Compilation halted due to static semantic errors." << endl;
+        exit(1);
+    }
 }
 
 

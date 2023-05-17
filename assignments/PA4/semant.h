@@ -35,7 +35,7 @@ public:
   bool is_subclass(Symbol, Symbol);
   void register_class_and_its_methods();
   Symbol get_lca(Symbol, Symbol);
-  void type_check();
+  void type_check(Classes);
   ClassTable(Classes);
   int errors() { return semant_errors; }
   ostream& semant_error();
