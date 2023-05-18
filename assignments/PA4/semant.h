@@ -29,8 +29,8 @@ private:
   
 
 public:
-  bool install_custom_classes(Classes);
-  bool get_parent_classes_and_check_inheritance();
+  void install_custom_classes(Classes);
+  void get_parent_classes_and_check_inheritance();
   bool check_main_class();
   bool is_subclass(Symbol, Symbol);
   void register_class_and_its_methods();

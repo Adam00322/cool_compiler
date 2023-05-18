@@ -207,24 +207,21 @@ void ClassTable::install_basic_classes() {
     class_map[Str] = Str_class;
 }
 
-bool ClassTable::install_custom_classes(Classes classes) {
+void ClassTable::install_custom_classes(Classes classes) {
     for(int i = classes->first(); classes->more(i); i = classes->next(i)) {
         Class_ c = classes->nth(i);
         Symbol name = c->get_name();
-        if(name == SELF_TYPE || name == Str || name == Int || name == Bool || name == Object) {
-            semant_error(c) << "Redefinition of basic class " << name << "is not allowed." << endl;
-            return false;
+        if(name == SELF_TYPE || name == Str || name == Int || name == Bool || name == Object || name == IO) {
+            semant_error(c) << "Redefinition of basic class " << name << "." << endl;
         }
-        if(class_map.find(name) != class_map.end()) {
+        else if(class_map.find(name) != class_map.end()) {
             semant_error(c) << "Class " << name << " was previously defined." << endl;
-            return false;
         }
         class_map[name] = c;
     }
-    return true;
 }
 
-bool ClassTable::get_parent_classes_and_check_inheritance() {
+void ClassTable::get_parent_classes_and_check_inheritance() {
     std::map<Symbol, int> in;
     for(auto it = class_map.begin(); it != class_map.end(); it++) {
         auto name = it->first;
@@ -235,15 +232,18 @@ bool ClassTable::get_parent_classes_and_check_inheritance() {
         Symbol parent = c->get_parent_name();
         if(parent == Int || parent == Bool || parent == Str || parent == SELF_TYPE) {
             semant_error(c) << "Class " << name << " cannot inherit class " << parent << "." << endl;
-            return false;
         }
-        if(class_map.find(parent) == class_map.end()) {
+        else if(class_map.find(parent) == class_map.end()) {
             semant_error(c) << "Class " << name << " inherits from an undefined class " << parent << "." << endl;
-            return false;
         }
         in[parent]++;
         parent_map[c->get_name()] = parent;
     }
+
+    if (class_table->errors()) {
+        return;
+    }
+
     int sz = class_map.size();
     std::queue<Symbol> q;
     for(auto it = class_map.begin(); it != class_map.end(); it++) {
@@ -265,9 +265,18 @@ bool ClassTable::get_parent_classes_and_check_inheritance() {
         }
     }
     if(sz > 0){
-        semant_error() << "Class inheritance graph has a cycle." << endl;
+        for(auto& t: in) {
+            if(t.second > 0) {
+                semant_error(class_map[t.first]) 
+                    << "Class " 
+                    << t.first 
+                    << ", or an ancestor of "
+                    << t.first
+                    << ", is involved in an inheritance cycle." 
+                    << endl;
+            }
+        }
     }
-    return true;
 }
 
 bool ClassTable::check_main_class() {
@@ -353,10 +362,10 @@ std::map<Symbol, method_class*> get_class_methods(Class_ class_definition) {
         
         if (class_methods.find(method_name) != class_methods.end())
         {
-            ostream& error_stream = class_table->semant_error(class_definition);
-            error_stream << "The method :";
-            method_name->print(error_stream);
-            error_stream << " has already been defined!\n";
+            class_table->semant_error(class_definition->get_filename(), method)
+                << "Method "
+                << method_name
+                << " is multiply defined.\n";
         }
         else
         {
@@ -401,10 +410,10 @@ std::map<Symbol, attr_class*> get_class_attributes(Class_ class_definition) {
         Symbol attr_name = attr->get_name();
         if (class_attrs.find(attr_name) != class_attrs.end())
         {
-            class_table->semant_error(class_definition)
-                << "The attribute :"
+            class_table->semant_error(class_definition->get_filename(), attr)
+                << "Attribute "
                 << attr_name
-                << " has already been defined!\n";
+                << " is multiply defined in class.\n";
         }
         class_attrs[attr_name] = attr;
     }
@@ -419,10 +428,8 @@ void build_attribute_scopes(Class_ current_class) {
         attr_class* attr_definition = x.second;
         if(attr_definition->get_name() == self){
             class_table->semant_error(attr_definition) 
-                << "Attribute " 
-                << attr_definition->get_name()
-                << " cannot be named self.\n";
-                continue;
+                << "'self' cannot be the name of an attribute.\n";
+            continue;
         }
         if(attr_definition->get_type() != SELF_TYPE && class_table->class_map.find(attr_definition->get_type()) == class_table->class_map.end()){
             class_table->semant_error(attr_definition) 
@@ -431,7 +438,7 @@ void build_attribute_scopes(Class_ current_class) {
                 << " of attribute "
                 << attr_definition->get_name()
                 << " is undefined.\n";
-                continue;
+            continue;
         }
 
         objects_table->addid(
@@ -477,12 +484,12 @@ void process_method(Class_ current_class, method_class* original_method, method_
     int parent_formal_ix = 0;
     
     if(original_method->get_return_type() != parent_method->get_return_type()) {
-        class_table->semant_error(current_class) 
+        class_table->semant_error(original_method) 
             << "In redefined method " 
             << original_method->get_name() 
-            << ", the return type " 
+            << ", return type " 
             << original_method->get_return_type() 
-            << " differs from the ancestor method return type "
+            << " is different from original return type "
             << parent_method->get_return_type() 
             << ".\n";
     }
@@ -497,32 +504,23 @@ void process_method(Class_ current_class, method_class* original_method, method_
         parent_method_formals = parent_method_args->next(parent_method_formals);
 
     if (original_methods_formals != parent_method_formals) {
-        class_table->semant_error(current_class) 
-            << "In redefined method " 
-            << original_method->get_name() 
-            << ", the number of arguments " 
-            << "(" << original_methods_formals << ")"
-            << " differs from the ancestor method's "
-            << "number of arguments "
-            << "(" << parent_method_formals << ")"
+        class_table->semant_error(original_method) 
+            << "Incompatible number of formal parameters in redefined method " 
+            << original_method->get_name()
             << ".\n";
     }
 
-    while (
-        original_method_args->more(original_formal_ix) &&
-        parent_method_args->more(parent_formal_ix)
-    )
-    {
+    while (original_method_args->more(original_formal_ix) && parent_method_args->more(parent_formal_ix)) {
         Formal original_formal = original_method_args->nth(original_formal_ix);
         Formal parent_formal = parent_method_args->nth(parent_formal_ix);
 
         if (original_formal->get_type() != parent_formal->get_type()) {
-            class_table->semant_error(current_class) 
+            class_table->semant_error(original_method) 
                 << "In redefined method " 
                 << original_method->get_name() 
-                << ", the return type of argument " 
+                << ", parameter type " 
                 << original_formal->get_type() 
-                << " differs from the corresponding ancestor method argument return type "
+                << " is different from original type "
                 << parent_formal->get_type() 
                 << ".\n";
         }
@@ -659,7 +657,7 @@ Symbol leq_class::type_check() {
             << e1_type 
             << " <= " 
             << e2_type 
-            << ".\n";
+            << "\n";
         e1_type = Object;
     }
     this->set_type(Bool);
@@ -689,7 +687,7 @@ Symbol lt_class::type_check() {
             << e1_type 
             << " < " 
             << e2_type 
-            << ".\n";
+            << "\n";
         e1_type = Object;
     }
     this->set_type(Bool);
@@ -718,7 +716,7 @@ Symbol divide_class::type_check() {
             << e1_type 
             << " / " 
             << e2_type 
-            << ".\n";
+            << "\n";
         e1_type = Object;
     }
     this->set_type(Int);
@@ -734,7 +732,7 @@ Symbol mul_class::type_check() {
             << e1_type 
             << " * " 
             << e2_type 
-            << ".\n";
+            << "\n";
         e1_type = Object;
     }
     this->set_type(Int);
@@ -750,7 +748,7 @@ Symbol sub_class::type_check() {
             << e1_type 
             << " - " 
             << e2_type 
-            << ".\n";
+            << "\n";
         e1_type = Object;
     }
     this->set_type(Int);
@@ -766,7 +764,7 @@ Symbol plus_class::type_check() {
             << e1_type 
             << " + " 
             << e2_type 
-            << ".\n";
+            << "\n";
         e1_type = Object;
     }
     this->set_type(Int);
@@ -835,7 +833,7 @@ Symbol typcase_class::type_check() {
     for (auto i = cases->first(); cases->more(i); i = cases->next(i)) {
         auto branch = static_cast<branch_class*>(cases->nth(i));
         if (branch_types.find(branch->get_type_decl()) != branch_types.end()) {
-            class_table->semant_error(this) 
+            class_table->semant_error(branch) 
                 << "Duplicate branch " 
                 << branch->get_type_decl() 
                 << " in case statement.\n";
@@ -953,6 +951,15 @@ Symbol static_dispatch_class::type_check() {
         class_table->semant_error(this) 
             << "Static dispatch to undefined class " 
             << expr_type 
+            << ".\n";
+        this->set_type(Object);
+        return Object;
+    }
+
+    if (class_table->class_map.find(type_name) == class_table->class_map.end()) {
+        class_table->semant_error(this) 
+            << "Static dispatch to undefined class " 
+            << type_name
             << ".\n";
         this->set_type(Object);
         return Object;
