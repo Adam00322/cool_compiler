@@ -65,10 +65,13 @@ virtual void dump_with_types(ostream&,int) = 0;
 Symbol get_name()   { return name; }		       \
 Symbol get_parent() { return parent; }     	       \
 Symbol get_filename() { return filename; }             \
+Features get_features() { return features; }		   \
 void dump_with_types(ostream&,int);                    
 
 
 #define Feature_EXTRAS                                        \
+virtual bool is_method() = 0;                                 \
+virtual Symbol get_name() = 0;								 \
 virtual void dump_with_types(ostream&,int) = 0; 
 
 
@@ -76,19 +79,37 @@ virtual void dump_with_types(ostream&,int) = 0;
 void dump_with_types(ostream&,int);    
 
 
+#define method_EXTRAS               \
+bool is_method() { return true; }   \
+Symbol get_name()     { return name; }
+
+#define attr_EXTRAS             \
+bool is_method() { return false;} \
+Symbol get_name()   { return name;  } \
+Symbol get_type()   { return type_decl;  } \
+Expression get_init()  { return init; }
+
 #define Formal_EXTRAS                              \
+virtual Symbol get_name() = 0;					 \
 virtual void dump_with_types(ostream&,int) = 0;
 
 
 #define formal_EXTRAS                           \
+Symbol get_name() { return name; }			  \
 void dump_with_types(ostream&,int);
 
 
 #define Case_EXTRAS                             \
+virtual Symbol get_type_decl() = 0;             \
+virtual Symbol get_name() = 0;                  \
+virtual Expression get_expr() = 0;			  \
 virtual void dump_with_types(ostream& ,int) = 0;
 
 
 #define branch_EXTRAS                                   \
+Symbol get_type_decl() { return type_decl; }            \
+Symbol get_name() { return name; }                      \
+Expression get_expr() { return expr; }				  \
 void dump_with_types(ostream& ,int);
 
 
