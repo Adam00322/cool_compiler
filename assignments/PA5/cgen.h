@@ -33,8 +33,8 @@ private:
 
    std::map<int, Symbol> class_tag_map_;
    std::map<Symbol, CgenNodeP> name_to_cgen_map_;
-   std::map<Symbol, std::vector<attr_class*>> class_attr_map_;  // 不包含parent中的attr
-   std::map<Symbol, std::vector<method_class*>> class_method_map_; // 每个class本层method
+   std::map<Symbol, std::vector<attr_class*>> class_attr_map_;
+   std::map<Symbol, std::vector<method_class*>> class_method_map_;
    std::map<Symbol, std::map<Symbol, int>> attr_offset_map_;
    std::map<Symbol, std::map<Symbol, int>> meth_offset_map_;
    std::map<Symbol, std::vector<std::pair<Symbol, Symbol>>> dispatch_tab_map_;
@@ -88,8 +88,8 @@ public:
     typedef std::list<std::pair<Symbol, int>> symbol2offsetList;
 private:
     std::list<symbol2offsetList> envlist_;
-    int formal_fp_offset_;  // 用来记录当前formal对于fp的偏移
-    int local_fp_offset_; // 用来记录当前local变量对于fp的偏移
+    int formal_fp_offset_;
+    int local_fp_offset_;
     int last_local_fp_offset_;
 
     void init_formal_fpoffset() {
@@ -109,7 +109,7 @@ public:
 
     void add_formal_id(Symbol name);
     void add_local_id(Symbol name);
-    bool lookup(Symbol name, int *offset); // 通过参数返回
+    bool lookup(Symbol name, int *offset);
 };
 
 void EnvTable::enterframe() {
@@ -129,7 +129,7 @@ void EnvTable::enterscope() {
     envlist_.push_back({});
 }
 
-void EnvTable::exitscope() { // 退出作用域的时候需要恢复local中的frame
+void EnvTable::exitscope() {
     envlist_.pop_back();
     local_fp_offset_ = last_local_fp_offset_;
 }
